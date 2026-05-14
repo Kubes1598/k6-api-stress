@@ -1,0 +1,46 @@
+name: k6
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 2 * * *"  # nightly stress
+    - cron: "0 2 * * 0"  # weekly soak (Sunday)
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - run: k6 run tests/smoke.ts
+        env: { BASE_URL: ${{ vars.STAGING_URL }} }
+
+  load:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - run: k6 run tests/load.ts
+        env: { BASE_URL: ${{ vars.STAGING_URL }} }
+
+  stress:
+    if: github.event.schedule == '0 2 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - run: k6 run tests/stress.ts
+        env: { BASE_URL: ${{ vars.STAGING_URL }} }
+
+  soak:
+    if: github.event.schedule == '0 2 * * 0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 400
+    steps:
+      - uses: actions/checkout@v4
+      - uses: grafana/setup-k6-action@v1
+      - run: k6 run tests/soak.ts
+        env: { BASE_URL: ${{ vars.STAGING_URL }} }
